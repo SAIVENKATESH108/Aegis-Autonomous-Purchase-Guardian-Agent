@@ -366,32 +366,24 @@ def seed_demo_data(repo: ItemRepository = Depends(get_repo)):
     - 1 Safety Recall item (Immediate 🚨 recall escalation + claim draft)
     - 1 Expiring Return item (Immediate ⏰ deadline warning + return draft)
     """
+    from app.schemas import ParsedReceipt
     demo_receipts = get_demo_receipts()
     results = []
 
     for receipt_data in demo_receipts:
-        receipt_input = ReceiptInput(
-            raw_text=receipt_data["raw_text"],
-            format=receipt_data["format"]
-        )
-        parsed = ingestion_agent.process_receipt(receipt_input)
-        
-        # Override with exact metadata purchase dates for deterministic time offsets
         meta = receipt_data.get("metadata", {})
-        if "purchase_date" in meta:
-            parsed.purchase_date = meta["purchase_date"]
-        if "name" in meta:
-            parsed.name = meta["name"]
-        if "merchant" in meta:
-            parsed.merchant = meta["merchant"]
-        if "price" in meta:
-            parsed.price = meta["price"]
-        if "model_number" in meta:
-            parsed.model_number = meta["model_number"]
-        if "return_window_days" in meta:
-            parsed.return_window_days = meta["return_window_days"]
-        if "warranty_days" in meta:
-            parsed.warranty_days = meta["warranty_days"]
+        parsed = ParsedReceipt(
+            name=meta.get("name", "Demo Product"),
+            merchant=meta.get("merchant", "Retailer"),
+            price=float(meta.get("price", 49.99)),
+            currency=meta.get("currency", "USD"),
+            purchase_date=meta.get("purchase_date") or datetime.now(timezone.utc),
+            category=meta.get("category", "General"),
+            model_number=meta.get("model_number"),
+            return_window_days=int(meta.get("return_window_days", 30)),
+            warranty_days=int(meta.get("warranty_days", 365)),
+            confidence_score=1.0
+        )
 
         item = repo.create_item(parsed, raw_input=receipt_data["raw_text"])
         triage_agent.evaluate_item(item, repo)

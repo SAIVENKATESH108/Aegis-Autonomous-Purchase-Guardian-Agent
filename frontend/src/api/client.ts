@@ -108,6 +108,15 @@ export function useApproveAlert() {
   });
 }
 
+async function extractError(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return data.detail || data.message || `HTTP ${res.status}: ${res.statusText}`;
+  } catch {
+    return `HTTP ${res.status}: ${res.statusText || fallback}`;
+  }
+}
+
 export function useDismissAlert() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -115,7 +124,10 @@ export function useDismissAlert() {
       const res = await fetch(`${API_BASE}/alerts/${id}/dismiss`, {
         method: 'POST',
       });
-      if (!res.ok) throw new Error('Failed to dismiss alert');
+      if (!res.ok) {
+        const msg = await extractError(res, 'Failed to dismiss alert');
+        throw new Error(msg);
+      }
       return res.json() as Promise<Escalation>;
     },
     onSuccess: () => {
@@ -131,7 +143,10 @@ export function useSeedDemo() {
   return useMutation({
     mutationFn: async () => {
       const res = await fetch(`${API_BASE}/demo/seed`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to load sample demonstration receipts');
+      if (!res.ok) {
+        const msg = await extractError(res, 'Failed to load sample demonstration receipts');
+        throw new Error(msg);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -147,7 +162,10 @@ export function useResetDemo() {
   return useMutation({
     mutationFn: async () => {
       const res = await fetch(`${API_BASE}/demo/reset`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to reset demo');
+      if (!res.ok) {
+        const msg = await extractError(res, 'Failed to reset demo');
+        throw new Error(msg);
+      }
       return res.json();
     },
     onSuccess: () => {

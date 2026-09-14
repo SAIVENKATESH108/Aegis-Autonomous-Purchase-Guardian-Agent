@@ -35,8 +35,8 @@ class IngestionAgent:
         parser = ReceiptParserFactory.get_parser(receipt_input)
         parsed = parser.parse(receipt_input)
 
-        # Enhance with Bedrock if live
-        if self.bedrock_config.is_live_bedrock and receipt_input.raw_text:
+        # Enhance with Bedrock if live and not disabled by permission error
+        if self.bedrock_config.is_live_bedrock and not getattr(self.bedrock_config, "_bedrock_disabled", False) and receipt_input.raw_text:
             enhanced = self._refine_with_llm(receipt_input.raw_text, parsed)
             if enhanced:
                 return enhanced
@@ -89,6 +89,7 @@ class IngestionAgent:
                 )
         except Exception as e:
             logger.warning(f"[IngestionAgent] LLM refinement fallback: {e}")
+            setattr(self.bedrock_config, "_bedrock_disabled", True)
         return None
 
 

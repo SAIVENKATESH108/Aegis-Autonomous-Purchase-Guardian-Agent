@@ -154,7 +154,7 @@ Verified Cardholder
 
     def _call_llm_if_available(self, prompt: str) -> Optional[str]:
         """Calls Strands Agent with BedrockModel if AWS credentials are active."""
-        if not self.bedrock_config.is_live_bedrock:
+        if not self.bedrock_config.is_live_bedrock or getattr(self.bedrock_config, "_bedrock_disabled", False):
             return None
 
         try:
@@ -175,6 +175,7 @@ Verified Cardholder
                 return text.strip()
         except Exception as e:
             logger.warning(f"[DraftAgent Bedrock Notice] {e}. Utilizing high-fidelity autonomous template.")
+            setattr(self.bedrock_config, "_bedrock_disabled", True)
         return None
 
 
