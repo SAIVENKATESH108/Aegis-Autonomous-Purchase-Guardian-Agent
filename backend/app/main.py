@@ -14,7 +14,7 @@ Fulfills all hackathon endpoints:
 from contextlib import asynccontextmanager
 from typing import List, Optional
 from datetime import datetime, timezone
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, status, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -52,6 +52,11 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Ensure tables exist immediately for serverless lambda environments
+Base.metadata.create_all(bind=db_singleton.engine)
+
+api_router = APIRouter()
 
 # Enable CORS for Vite frontend
 app.add_middleware(
@@ -148,7 +153,7 @@ def escalation_to_response(e: Escalation) -> dict:
     }
 
 
-@app.get("/health")
+@api_router.get("/health")
 def health_check():
     return {
         "status": "healthy",
@@ -158,7 +163,7 @@ def health_check():
     }
 
 
-@app.get("/stats", response_model=SystemStats)
+@api_router.get("/stats", response_model=SystemStats)
 def get_stats(repo: ItemRepository = Depends(get_repo)):
     """Provides guardian telemetry for dashboard counters."""
     stats = repo.get_stats()
@@ -166,7 +171,7 @@ def get_stats(repo: ItemRepository = Depends(get_repo)):
     return stats
 
 
-@app.post("/items", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
+@api_router.post("/items", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def add_item(receipt: ReceiptInput, repo: ItemRepository = Depends(get_repo)):
     """
     Ingests a new purchase receipt:
@@ -189,7 +194,7 @@ def add_item(receipt: ReceiptInput, repo: ItemRepository = Depends(get_repo)):
     return item_to_response(refreshed or item)
 
 
-@app.get("/items", response_model=List[ItemResponse])
+@api_router.get("/items", response_model=List[ItemResponse])
 def list_items(status: Optional[str] = None, repo: ItemRepository = Depends(get_repo)):
     """
     Returns tracked items sorted by nearest deadline (MinHeap prioritized).
@@ -198,7 +203,7 @@ def list_items(status: Optional[str] = None, repo: ItemRepository = Depends(get_
     return [item_to_response(it) for it in items]
 
 
-@app.get("/items/{item_id}", response_model=ItemResponse)
+@api_router.get("/items/{item_id}", response_model=ItemResponse)
 def get_item(item_id: str, repo: ItemRepository = Depends(get_repo)):
     """Returns detailed purchase record and audit history."""
     item = repo.get_item(item_id)
@@ -207,7 +212,7 @@ def get_item(item_id: str, repo: ItemRepository = Depends(get_repo)):
     return item_to_response(item)
 
 
-@app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+@api_router.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_item(item_id: str, repo: ItemRepository = Depends(get_repo)):
     """Deletes an item and removes it from the deadline heap."""
     success = repo.delete_item(item_id)
@@ -216,7 +221,7 @@ def delete_item(item_id: str, repo: ItemRepository = Depends(get_repo)):
     return None
 
 
-@app.get("/alerts", response_model=List[EscalationResponse])
+@api_router.get("/alerts", response_model=List[EscalationResponse])
 def list_alerts(
     status: Optional[str] = Query("pending", description="Filter by pending, approved, or dismissed"),
     repo: ItemRepository = Depends(get_repo)
@@ -229,7 +234,7 @@ def list_alerts(
     return [escalation_to_response(e) for e in escalations]
 
 
-@app.post("/alerts/{id}/approve", response_model=EscalationResponse)
+@api_router.post("/alerts/{id}/approve", response_model=EscalationResponse)
 def approve_alert(
     id: str,
     body: Optional[ActionApprovalRequest] = None,
@@ -252,7 +257,7 @@ def approve_alert(
     return escalation_to_response(escalation)
 
 
-@app.post("/alerts/{id}/dismiss", response_model=EscalationResponse)
+@api_router.post("/alerts/{id}/dismiss", response_model=EscalationResponse)
 def dismiss_alert(id: str, repo: ItemRepository = Depends(get_repo)):
     """Dismisses an escalation without taking action."""
     escalation = repo.resolve_escalation(id, "dismissed")
@@ -261,8 +266,8 @@ def dismiss_alert(id: str, repo: ItemRepository = Depends(get_repo)):
     return escalation_to_response(escalation)
 
 
-@app.get("/events")
-@app.get("/events/recent")
+@api_router.get("/events")
+@api_router.get("/events/recent")
 def get_recent_events():
     """Returns recent broadcast events from Observer pattern notifiers."""
     return {
@@ -273,7 +278,7 @@ def get_recent_events():
 
 
 
-@app.get("/recalls/live-search")
+@api_router.get("/recalls/live-search")
 def live_search_recalls(q: str = Query(..., description="Product name or keyword to query live in CPSC database")):
     """
     Live Federal Recall Radar:
@@ -289,7 +294,7 @@ def live_search_recalls(q: str = Query(..., description="Product name or keyword
     }
 
 
-@app.post("/recalls/protect")
+@api_router.post("/recalls/protect")
 def protect_recalled_product(payload: dict, repo: ItemRepository = Depends(get_repo)):
     """
     Shield a recalled product directly from live federal search results into Aegis.
@@ -352,7 +357,7 @@ def protect_recalled_product(payload: dict, repo: ItemRepository = Depends(get_r
     return item_to_response(refreshed or item)
 
 
-@app.post("/demo/seed")
+@api_router.post("/demo/seed")
 def seed_demo_data(repo: ItemRepository = Depends(get_repo)):
     """
     1-Click Seed Endpoint for Hackathon Evaluation:
@@ -400,7 +405,7 @@ def seed_demo_data(repo: ItemRepository = Depends(get_repo)):
     }
 
 
-@app.post("/demo/reset")
+@api_router.post("/demo/reset")
 def reset_database(repo: ItemRepository = Depends(get_repo)):
     """Resets all items and alerts for clean demonstration testing."""
     items = repo.list_items()
@@ -409,7 +414,7 @@ def reset_database(repo: ItemRepository = Depends(get_repo)):
     return {"message": "All items and escalations have been reset."}
 
 
-@app.post("/demo/simulate-expiry")
+@api_router.post("/demo/simulate-expiry")
 def simulate_expiry(payload: Optional[dict] = None, repo: ItemRepository = Depends(get_repo)):
     """
     Simulated Time-Travel for Video/Live Demos:
@@ -459,4 +464,10 @@ def simulate_expiry(payload: Optional[dict] = None, repo: ItemRepository = Depen
         "item": item_to_response(refreshed or target_item),
         "escalations_created": len(escalations)
     }
+
+
+# Mount both at root and /api for seamless local and Vercel routing
+app.include_router(api_router)
+app.include_router(api_router, prefix="/api")
+
 

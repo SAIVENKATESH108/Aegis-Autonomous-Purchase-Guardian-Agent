@@ -26,8 +26,10 @@ load_dotenv(dotenv_path=_env_path, override=True)
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Aegis — Autonomous Purchase Guardian Agent"
-    API_PREFIX: str = "/api"
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./aegis_guardian.db")
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite:////tmp/aegis_guardian.db" if (os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME")) else "sqlite:///./aegis_guardian.db"
+    )
     
     # AWS Bedrock Settings
     AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
