@@ -14,7 +14,7 @@ export const AlertFeed: React.FC = () => {
 
   const handleApprove = (alert: Escalation) => {
     approveMutation.mutate(
-      { id: alert.id },
+      { id: alert.id, alert },
       {
         onSuccess: () => {
           addToast({

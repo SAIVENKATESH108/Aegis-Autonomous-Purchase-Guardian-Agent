@@ -91,13 +91,25 @@ export function useAddItem() {
 export function useApproveAlert() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
+    mutationFn: async ({ id, notes, alert }: { id: string; notes?: string; alert?: Partial<Escalation> }) => {
       const res = await fetch(`${API_BASE}/alerts/${id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({
+          notes,
+          item_name: alert?.item_name,
+          merchant: alert?.merchant,
+          type: alert?.type,
+          severity: alert?.severity,
+          reason: alert?.reason,
+          draft_action: alert?.draft_action,
+          draft_recipient: alert?.draft_recipient,
+        }),
       });
-      if (!res.ok) throw new Error('Failed to approve action draft');
+      if (!res.ok) {
+        const msg = await extractError(res, 'Failed to approve action draft');
+        throw new Error(msg);
+      }
       return res.json() as Promise<Escalation>;
     },
     onSuccess: () => {

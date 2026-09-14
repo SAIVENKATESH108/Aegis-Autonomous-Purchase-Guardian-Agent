@@ -86,6 +86,13 @@ class EscalationResponse(BaseModel):
 
 class ActionApprovalRequest(BaseModel):
     notes: Optional[str] = None
+    item_name: Optional[str] = None
+    merchant: Optional[str] = None
+    type: Optional[str] = None
+    severity: Optional[str] = None
+    reason: Optional[str] = None
+    draft_action: Optional[str] = None
+    draft_recipient: Optional[str] = None
 
 
 class SystemStats(BaseModel):
