@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.pytest_cache/
+
+# Environment variables & secrets
+.env
+backend/.env
+*.env.local
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+backend/aegis_guardian.db
+aegis_guardian.db
+
+# Logs & temp
+*.log
+.DS_Store
+Thumbs.db

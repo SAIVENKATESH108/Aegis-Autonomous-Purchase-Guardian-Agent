@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #FAFAF8;
+    color: #0F172A;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* ============================================================
+   ANIMATION UTILITIES
+   Replaces tailwindcss-animate plugin for modal/toast transitions.
+   Used by: AddItemModal, ItemDetailModal, ToastContainer
+   ============================================================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes zoomIn95 {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInFromBottom3 {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* animate-in: enables the animation base class */
+.animate-in {
+  animation-fill-mode: both;
+  animation-duration: 150ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* fade-in modifier */
+.fade-in {
+  animation-name: fadeIn;
+}
+
+/* zoom-in-95 modifier */
+.zoom-in-95 {
+  animation-name: zoomIn95;
+}
+
+/* slide-in-from-bottom-3 modifier */
+.slide-in-from-bottom-3 {
+  animation-name: slideInFromBottom3;
+}
+
+/* Duration overrides for animate-in */
+.duration-150 { animation-duration: 150ms; }
+.duration-200 { animation-duration: 200ms; }
+
+/* ============================================================
+   GLASSMORPHISM & DESIGN UTILITIES
+   ============================================================ */
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(231, 231, 226, 0.9);
+}
+
+.subtle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+}
+
+/* ============================================================
+   CUSTOM SCROLLBAR
+   Applied to action draft text boxes in AlertFeed
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F4F4F1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}

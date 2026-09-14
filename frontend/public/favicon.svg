@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <clipPath id="circleClip">
+      <circle cx="32" cy="32" r="32" />
+    </clipPath>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+  </defs>
+  <!-- Rounded-Full Outer Circle -->
+  <circle cx="32" cy="32" r="32" fill="#022c22" />
+  <circle cx="32" cy="32" r="30" fill="url(#shieldGrad)" stroke="#10b981" stroke-width="2" />
+  <!-- Aegis Guardian Shield Shape -->
+  <path d="M32 12 L46 17 C46 30 38 43 32 50 C26 43 18 30 18 17 Z" fill="#064e3b" stroke="#34d399" stroke-width="2" />
+  <!-- Inner Check / Guardian Wings -->
+  <path d="M26 31 L30 35 L38 25" fill="none" stroke="#a7f3d0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Autonomous Pulse Point -->
+  <circle cx="32" cy="18" r="2.5" fill="#34d399" />
+</svg>
