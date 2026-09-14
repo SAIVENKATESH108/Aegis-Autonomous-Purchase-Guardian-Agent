@@ -32,8 +32,8 @@ export const DemoBanner: React.FC = () => {
     simulateMutation.mutate(undefined, {
       onSuccess: (res: any) => {
         addToast({
-          title: '⚡ Day 28 Reached (Simulated)',
-          message: res.message || 'Return window now closing in 2 days. Escalation generated!',
+          title: res?.title || '⚡ Return Window Closing (Simulated)',
+          message: res?.message || 'Return window now closing in 2 days. Escalation generated!',
           type: 'urgent',
         });
         setActiveTab('alerts');

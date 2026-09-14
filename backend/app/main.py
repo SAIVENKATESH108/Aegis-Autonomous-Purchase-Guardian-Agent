@@ -464,8 +464,10 @@ def simulate_expiry(payload: Optional[dict] = None, repo: ItemRepository = Depen
     escalations = triage_agent.evaluate_item(target_item, repo)
 
     refreshed = repo.get_item(target_item.id)
+    closing_day = target_item.return_window_days - 2
     return {
-        "message": f"Time-traveled '{target_item.name}' to Day {target_item.return_window_days - 2}. Return window now expires in 2 days.",
+        "title": f"⚡ Day {closing_day} Reached (Simulated)",
+        "message": f"Time-traveled '{target_item.name}' to Day {closing_day}. Return window now expires in 2 days.",
         "item": item_to_response(refreshed or target_item),
         "escalations_created": len(escalations)
     }
