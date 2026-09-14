@@ -24,12 +24,34 @@ from dotenv import load_dotenv
 _env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=_env_path, override=True)
 
+def _get_safe_database_url() -> str:
+    env_url = os.getenv("DATABASE_URL")
+    if env_url and not env_url.startswith("sqlite:///."):
+        return env_url
+
+    # Check for Vercel, AWS Lambda, or any cloud container environment
+    is_serverless = any(
+        os.getenv(k) for k in [
+            "VERCEL", "VERCEL_ENV", "VERCEL_URL",
+            "AWS_LAMBDA_FUNCTION_NAME", "LAMBDA_TASK_ROOT", "NOW_REGION"
+        ]
+    )
+    if is_serverless:
+        return "sqlite:////tmp/aegis_guardian.db"
+
+    # Test write permissions in current directory
+    try:
+        test_file = Path("./.aegis_write_test")
+        test_file.touch()
+        test_file.unlink()
+        return "sqlite:///./aegis_guardian.db"
+    except Exception:
+        return "sqlite:////tmp/aegis_guardian.db"
+
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Aegis — Autonomous Purchase Guardian Agent"
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "sqlite:////tmp/aegis_guardian.db" if (os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME")) else "sqlite:///./aegis_guardian.db"
-    )
+    DATABASE_URL: str = _get_safe_database_url()
     
     # AWS Bedrock Settings
     AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
@@ -55,7 +77,8 @@ Base = declarative_base()
 class DatabaseSingleton:
     """
     Singleton Pattern: Manages the SQLAlchemy Engine and Sessionmaker.
-    Guarantees thread-safe shared SQLite access with foreign keys enabled.
+    Guarantees thread-safe shared SQLite access with foreign keys enabled and
+    automatic serverless read-only fallback.
     """
     _instance = None
     _engine = None
@@ -64,8 +87,25 @@ class DatabaseSingleton:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DatabaseSingleton, cls).__new__(cls)
-            connect_args = {"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
-            cls._engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, echo=False)
+            db_url = settings.DATABASE_URL
+            connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
+            
+            # Resilient engine initialization
+            try:
+                engine = create_engine(db_url, connect_args=connect_args, echo=False)
+                Base.metadata.create_all(bind=engine)
+                cls._engine = engine
+            except Exception as e:
+                # If read-only filesystem, fallback to /tmp or in-memory
+                try:
+                    fallback_engine = create_engine("sqlite:////tmp/aegis_guardian.db", connect_args={"check_same_thread": False}, echo=False)
+                    Base.metadata.create_all(bind=fallback_engine)
+                    cls._engine = fallback_engine
+                except Exception:
+                    mem_engine = create_engine("sqlite:///:memory:?check_same_thread=False", echo=False)
+                    Base.metadata.create_all(bind=mem_engine)
+                    cls._engine = mem_engine
+
             cls._sessionmaker = sessionmaker(autocommit=False, autoflush=False, bind=cls._engine)
         return cls._instance
 

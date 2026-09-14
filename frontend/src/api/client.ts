@@ -202,7 +202,10 @@ export function useProtectRecall() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Failed to shield recalled product');
+      if (!res.ok) {
+        const msg = await extractError(res, 'Failed to shield recalled product');
+        throw new Error(msg);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -223,7 +226,10 @@ export function useSimulateExpiry() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload || {}),
       });
-      if (!res.ok) throw new Error('Failed to simulate expiry');
+      if (!res.ok) {
+        const msg = await extractError(res, 'Failed to simulate expiry');
+        throw new Error(msg);
+      }
       return res.json();
     },
     onSuccess: () => {

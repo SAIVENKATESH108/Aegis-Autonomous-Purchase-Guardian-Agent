@@ -14,7 +14,8 @@ Fulfills all hackathon endpoints:
 from contextlib import asynccontextmanager
 from typing import List, Optional
 from datetime import datetime, timezone
-from fastapi import FastAPI, Depends, HTTPException, Query, status, APIRouter
+from fastapi import FastAPI, Depends, HTTPException, Query, status, APIRouter, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -66,6 +67,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    tb = traceback.format_exc()
+    print(f"[Unhandled Server Error] {request.method} {request.url.path}: {exc}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {str(exc)}"}
+    )
 
 
 def get_repo():
