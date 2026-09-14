@@ -169,6 +169,8 @@ def health_check():
     return {
         "status": "healthy",
         "service": settings.PROJECT_NAME,
+        "database_url": settings.DATABASE_URL,
+        "engine_url": str(db_singleton.engine.url) if db_singleton.engine else None,
         "bedrock": bedrock_singleton.status_summary,
         "heap_size": len(global_deadline_heap)
     }

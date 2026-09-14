@@ -14,6 +14,7 @@ Justification:
 import os
 from pathlib import Path
 from typing import Optional
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -24,34 +25,43 @@ from dotenv import load_dotenv
 _env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=_env_path, override=True)
 
-def _get_safe_database_url() -> str:
-    env_url = os.getenv("DATABASE_URL")
-    if env_url and not env_url.startswith("sqlite:///."):
-        return env_url
-
-    # Check for Vercel, AWS Lambda, or any cloud container environment
-    is_serverless = any(
-        os.getenv(k) for k in [
-            "VERCEL", "VERCEL_ENV", "VERCEL_URL",
-            "AWS_LAMBDA_FUNCTION_NAME", "LAMBDA_TASK_ROOT", "NOW_REGION"
-        ]
-    )
-    if is_serverless:
-        return "sqlite:////tmp/aegis_guardian.db"
-
-    # Test write permissions in current directory
+def is_serverless_or_readonly() -> bool:
+    serverless_vars = [
+        "VERCEL", "VERCEL_ENV", "VERCEL_URL",
+        "AWS_LAMBDA_FUNCTION_NAME", "LAMBDA_TASK_ROOT", "NOW_REGION"
+    ]
+    if any(os.getenv(k) for k in serverless_vars):
+        return True
+    # If on Linux or container, test if current directory is writable
     try:
         test_file = Path("./.aegis_write_test")
         test_file.touch()
         test_file.unlink()
-        return "sqlite:///./aegis_guardian.db"
+        return False
     except Exception:
-        return "sqlite:////tmp/aegis_guardian.db"
+        return True
+
+
+def _get_temp_database_url() -> str:
+    import tempfile
+    tmp_dir = tempfile.gettempdir()
+    db_file = Path(tmp_dir) / "aegis_guardian.db"
+    return f"sqlite:///{db_file.as_posix()}"
+
+
+def _sanitize_database_url(url: Optional[str]) -> str:
+    target = url or os.getenv("DATABASE_URL") or "sqlite:///./aegis_guardian.db"
+    if "sqlite" in target.lower():
+        # If serverless or read-only container, force writable temp path
+        if is_serverless_or_readonly():
+            if ":memory:" not in target and not target.startswith("sqlite:////tmp"):
+                return _get_temp_database_url()
+    return target
 
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Aegis — Autonomous Purchase Guardian Agent"
-    DATABASE_URL: str = _get_safe_database_url()
+    DATABASE_URL: str = _sanitize_database_url(None)
     
     # AWS Bedrock Settings
     AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
@@ -69,9 +79,28 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        return _sanitize_database_url(v)
+
+
 settings = Settings()
 
 Base = declarative_base()
+
+
+def _try_create_writable_engine(url: str):
+    from sqlalchemy import text
+    connect_args = {"check_same_thread": False} if "sqlite" in url else {}
+    eng = create_engine(url, connect_args=connect_args, echo=False)
+    # Actively test write capability before accepting
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE IF NOT EXISTS _aegis_ping (id INTEGER PRIMARY KEY)"))
+        conn.execute(text("INSERT OR REPLACE INTO _aegis_ping (id) VALUES (1)"))
+        conn.execute(text("DROP TABLE _aegis_ping"))
+    Base.metadata.create_all(bind=eng)
+    return eng
 
 
 class DatabaseSingleton:
@@ -88,24 +117,21 @@ class DatabaseSingleton:
         if cls._instance is None:
             cls._instance = super(DatabaseSingleton, cls).__new__(cls)
             db_url = settings.DATABASE_URL
-            connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
             
-            # Resilient engine initialization
+            # Resilient engine initialization with automatic fallbacks
+            engine = None
             try:
-                engine = create_engine(db_url, connect_args=connect_args, echo=False)
-                Base.metadata.create_all(bind=engine)
-                cls._engine = engine
-            except Exception as e:
-                # If read-only filesystem, fallback to /tmp or in-memory
+                engine = _try_create_writable_engine(db_url)
+            except Exception as primary_err:
+                fallback_tmp = _get_temp_database_url()
+                print(f"[Aegis Database] Primary DB ({db_url}) write check failed: {primary_err}. Falling back to {fallback_tmp}")
                 try:
-                    fallback_engine = create_engine("sqlite:////tmp/aegis_guardian.db", connect_args={"check_same_thread": False}, echo=False)
-                    Base.metadata.create_all(bind=fallback_engine)
-                    cls._engine = fallback_engine
-                except Exception:
-                    mem_engine = create_engine("sqlite:///:memory:?check_same_thread=False", echo=False)
-                    Base.metadata.create_all(bind=mem_engine)
-                    cls._engine = mem_engine
+                    engine = _try_create_writable_engine(fallback_tmp)
+                except Exception as tmp_err:
+                    print(f"[Aegis Database] Temp DB write check failed: {tmp_err}. Falling back to in-memory SQLite")
+                    engine = _try_create_writable_engine("sqlite:///:memory:?check_same_thread=False")
 
+            cls._engine = engine
             cls._sessionmaker = sessionmaker(autocommit=False, autoflush=False, bind=cls._engine)
         return cls._instance
 
